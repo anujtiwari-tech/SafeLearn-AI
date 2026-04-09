@@ -30,6 +30,15 @@ async def get_my_threat_history(
         
         checks = t.performed_checks.split(", ") if t.performed_checks else []
         
+        # Try to parse consequences from scan_metadata if available
+        consequences = None
+        if t.scan_metadata:
+            try:
+                metadata = json.loads(t.scan_metadata)
+                consequences = metadata.get('consequences')
+            except:
+                pass
+        
         result.append(schemas.ThreatLogResponse(
             id=t.id,
             url=t.url,
@@ -37,6 +46,7 @@ async def get_my_threat_history(
             threat_level=t.threat_level,
             action_taken=t.action_taken,
             explanation=t.explanation,
+            consequences=consequences,  # Add this field to your schema
             confidence_score=t.confidence_score,
             risk_indicators=indicators,
             performed_checks=checks,
@@ -51,7 +61,7 @@ async def analyze_threat(
     current_user: models.User = Depends(security.get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
-    """Analyze URL/text for threats and generate explanation"""
+    """Analyze URL/text for threats and generate explanation with consequences"""
     user_id = current_user.id
     
     if current_user.protection_paused_until and current_user.protection_paused_until.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc):
@@ -61,6 +71,7 @@ async def analyze_threat(
             threat_level="safe",
             confidence_score=0.0,
             explanation="Protection is currently paused. Scanning will resume automatically.",
+            consequences="No consequences - protection is paused.",
             risk_indicators=[],
             performed_checks=["Protection paused by user"],
             action_recommended="allow",
@@ -93,12 +104,17 @@ async def analyze_threat(
         threat_level = "low"
         action = "allow"
     
-    explanation = ai_service.generate_explanation(
+    # NEW: Generate enhanced explanation with consequences
+    explanation_data = ai_service.generate_explanation_with_consequences(
         threat_type=threat_type,
         risk_indicators=all_indicators,
         url=request.url,
         is_threat=is_threat
     )
+    
+    # Extract components
+    explanation = f"Verdict: **{explanation_data['verdict']}**\nReasoning: {explanation_data['simple_explanation']}\nSafety Tip: {explanation_data['safety_tip']}"
+    consequences = explanation_data['consequences']
     
     structured_indicators = [{"type": "Security Alert", "detail": i, "severity": "medium"} for i in all_indicators[:3]]
     if not is_threat:
@@ -130,6 +146,13 @@ async def analyze_threat(
     else:
         structured_indicators = [{"type": "Security Alert", "detail": i, "severity": "medium"} for i in all_indicators[:3]]
 
+    # Store consequences in scan_metadata
+    scan_metadata = json.dumps({
+        "consequences": consequences,
+        "verdict": explanation_data['verdict'],
+        "simple_explanation": explanation_data['simple_explanation']
+    })
+
     threat_log = models.ThreatLog(
         user_id=user_id,
         url=log_url,
@@ -138,7 +161,8 @@ async def analyze_threat(
         action_taken=action,
         explanation=explanation,
         risk_indicators=json.dumps(structured_indicators),
-        performed_checks=", ".join(performed_checks)
+        performed_checks=", ".join(performed_checks),
+        scan_metadata=scan_metadata  # Store consequences here
     )
     db.add(threat_log)
     
@@ -153,6 +177,7 @@ async def analyze_threat(
         threat_level=threat_log_level,
         confidence_score=confidence,
         explanation=explanation,
+        consequences=consequences,  # Add this field to your schema
         risk_indicators=structured_indicators,
         performed_checks=performed_checks,
         action_recommended=action,
@@ -165,7 +190,7 @@ async def analyze_email(
     current_user: models.User = Depends(security.get_current_active_user),
     db: Session = Depends(database.get_db)
 ):
-    """Analyze email content for phishing indicators using lightweight model"""
+    """Analyze email content for phishing indicators with consequences"""
     
     risk_indicators = []
     threat_type = "none"
@@ -208,16 +233,20 @@ async def analyze_email(
     threat_level = "high" if security_score < 40 else "medium" if security_score < 60 else "low"
     action = "warn" if is_threat else "allow"
 
-    # Generate AI explanation using the new specialized email model
-    explanation = ai_service.generate_email_explanation(
+    # NEW: Generate email explanation with consequences
+    explanation_data = ai_service.generate_email_explanation_with_consequences(
         sender_name=email_data.sender_name,
         sender_email=email_data.sender_email,
         subject=email_data.subject,
-        body_snippet=email_data.body_text[:300], # Send a snippet to keep it fast
+        body_snippet=email_data.body_text[:300],
         risk_indicators=risk_indicators[:5],
         is_threat=is_threat,
         model="llama3-8b-8192"
     )
+    
+    # Extract components
+    explanation = f"Verdict: **{explanation_data['verdict']}**\nReasoning: {explanation_data['simple_explanation']}\nSafety Tip: {explanation_data['safety_tip']}"
+    consequences = explanation_data['consequences']
     
     structured_indicators = [{"type": "Security Alert", "detail": i, "severity": "medium"} for i in risk_indicators[:3]]
     if not is_threat:
@@ -228,7 +257,9 @@ async def analyze_email(
         "sender_name": email_data.sender_name,
         "subject": email_data.subject,
         "body_snippet": email_data.body_text[:200] + "..." if len(email_data.body_text) > 200 else email_data.body_text,
-        "platform": email_data.email_platform
+        "platform": email_data.email_platform,
+        "consequences": consequences,  # Store consequences
+        "verdict": explanation_data['verdict']
     }
 
     # Standardize the Target Destination to email:// format as requested
@@ -240,32 +271,25 @@ async def analyze_email(
         subject_snippet = email_data.subject[:40] + "..." if len(email_data.subject) > 40 else email_data.subject
         display_url = f"{display_url} - {subject_snippet}"
 
-    # Check for existing recent log entry for the same URL and user (within 5 minutes)
+    # Check for existing recent log entry
     recent_entry = None
     if email_data.current_url:
-        # Use UTC for consistent timing
         time_threshold = datetime.utcnow() - timedelta(minutes=5)
         
-        # 1. Try exact match first
         recent_entry = db.query(models.ThreatLog).filter(
             models.ThreatLog.user_id == current_user.id,
             models.ThreatLog.url == email_data.current_url,
             models.ThreatLog.timestamp >= time_threshold
         ).order_by(models.ThreatLog.timestamp.desc()).first()
 
-        # 2. If no exact match, try fuzzy base-path match for Gmail/Outlook
         if not recent_entry:
-            # Normalize: Get domain + base path (e.g. mail.google.com/mail/u/0/)
-            # Strip fragments and query params
             base_url = email_data.current_url.split('#')[0].split('?')[0].rstrip('/')
-            
             recent_entry = db.query(models.ThreatLog).filter(
                 models.ThreatLog.user_id == current_user.id,
                 models.ThreatLog.url.like(f"{base_url}%"),
                 models.ThreatLog.timestamp >= time_threshold
             ).order_by(models.ThreatLog.timestamp.desc()).first()
             
-            # 3. Last fallback: match any Gmail/Outlook entry if platform is known
             if not recent_entry:
                 platform_domain = None
                 if 'mail.google.com' in email_data.current_url:
@@ -281,18 +305,17 @@ async def analyze_email(
                     ).order_by(models.ThreatLog.timestamp.desc()).first()
 
     if recent_entry:
-        # Update existing entry with rich email data
+        # Update existing entry
         recent_entry.threat_type = "Phishing Email" if is_threat else recent_entry.threat_type
         recent_entry.threat_level = threat_level if is_threat else recent_entry.threat_level
         recent_entry.action_taken = action if is_threat else recent_entry.action_taken
         recent_entry.explanation = explanation
         recent_entry.risk_indicators = json.dumps(structured_indicators)
         recent_entry.scan_metadata = json.dumps(email_metadata)
-        # Keep the higher confidence score
         recent_entry.confidence_score = max(recent_entry.confidence_score or 0, min(1.0, score_deductions / 100.0))
         threat_log = recent_entry
     else:
-        # Create new entry if none exists
+        # Create new entry
         threat_log = models.ThreatLog(
             user_id=current_user.id,
             url=display_url,
@@ -308,7 +331,7 @@ async def analyze_email(
         db.add(threat_log)
     
     if is_threat:
-         current_user.total_scans += 1
+        current_user.total_scans += 1
     
     db.commit()
     db.refresh(threat_log)
@@ -319,6 +342,7 @@ async def analyze_email(
         threat_level=threat_level if is_threat else "safe",
         confidence_score=min(1.0, score_deductions / 100.0),
         explanation=explanation,
+        consequences=consequences,  # Add consequences to response
         risk_indicators=structured_indicators,
         performed_checks=performed_checks,
         action_recommended=action,
@@ -353,11 +377,11 @@ async def submit_feedback(
     db.commit()
     return schemas.FeedbackResponse(
         message="Thank you for your feedback!",
-        feedback_id=0, # Placeholder or actual ID if needed
+        feedback_id=0,
         security_score_updated=score_update
     )
 
-# ===== Helper Functions (Cleaned) =====
+# ===== Helper Functions =====
 
 def _analyze_sender(sender_email: str, sender_name: Optional[str] = None) -> dict:
     indicators = []

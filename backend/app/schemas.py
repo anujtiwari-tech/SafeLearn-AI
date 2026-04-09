@@ -77,7 +77,7 @@ class LearningModuleMetadata(BaseModel):
     id: str
     title: str
     description: str
-    type: str # lesson, quiz
+    type: str  # lesson, quiz
     duration: str
     points: int
     content: Optional[str] = None
@@ -140,7 +140,7 @@ class RiskIndicator(BaseModel):
     """Detailed risk indicator"""
     type: str
     detail: str
-    severity: str # low, medium, high, critical
+    severity: str  # low, medium, high, critical
 
 class ThreatAnalysisRequest(BaseModel):
     """Request to analyze a URL/text for threats"""
@@ -151,25 +151,28 @@ class ThreatAnalysisRequest(BaseModel):
     user_id: Optional[int] = None
 
 class ThreatAnalysisResponse(BaseModel):
-    """Response from threat analysis"""
+    """Response from threat analysis with consequences"""
     is_threat: bool
     threat_type: str
     threat_level: str
     confidence_score: float = Field(..., ge=0.0, le=1.0)
     explanation: str
+    consequences: Optional[str] = None  # ← NEW FIELD: What happens if user ignores warning
     risk_indicators: List[RiskIndicator]
     performed_checks: List[str] = []
     action_recommended: str  # block, warn, allow
     timestamp: datetime
+    threat_log_id: Optional[int] = None
 
 class ThreatLogResponse(BaseModel):
-    """Threat log entry for history view"""
+    """Threat log entry for history view with consequences"""
     id: int
     url: str
     threat_type: str
     threat_level: str
     action_taken: str
     explanation: Optional[str]
+    consequences: Optional[str] = None  # ← NEW FIELD
     confidence_score: Optional[float]
     risk_indicators: Optional[List[RiskIndicator]] = None
     performed_checks: Optional[List[str]] = None
@@ -200,6 +203,7 @@ class ThreatHistoryItem(BaseModel):
     url: str
     threat_type: str
     explanation: Optional[str]
+    consequences: Optional[str] = None  # ← NEW FIELD
     timestamp: datetime
     is_helpful: Optional[bool]
     feedback_count: int
@@ -233,8 +237,7 @@ class PrivacyLabel(BaseModel):
     last_updated: datetime
 
 
-
-# Add to existing schemas.py
+# ===== FILE SCAN SCHEMAS =====
 
 class FileScanRequest(BaseModel):
     """File scan request (for documentation)"""
@@ -272,6 +275,8 @@ class FileScanLogResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# ===== EMAIL ANALYSIS SCHEMAS =====
+
 class EmailAnalysisRequest(BaseModel):
     """Request to analyze email content"""
     sender_email: str
@@ -282,3 +287,7 @@ class EmailAnalysisRequest(BaseModel):
     has_attachment: bool = False
     email_platform: Optional[str] = None  # "gmail", "outlook", etc.
     current_url: Optional[str] = None
+
+class EmailAnalysisResponse(ThreatAnalysisResponse):
+    """Email analysis response (extends ThreatAnalysisResponse)"""
+    pass
