@@ -16,32 +16,37 @@ try:
     MAGIC_AVAILABLE = True
 except ImportError:
     MAGIC_AVAILABLE = False
-    print("⚠️  python-magic not available. File type detection will use extension-based method.")
+    print("[WARN] python-magic not available. File type detection will use extension-based method.")
 
 try:
     import pefile
     PEFILE_AVAILABLE = True
 except ImportError:
     PEFILE_AVAILABLE = False
-    print("⚠️  pefile not available. PE file analysis will be limited.")
+    print("[WARN] pefile not available. PE file analysis will be limited.")
 
 try:
     import pdfplumber
     PDFPLUMBER_AVAILABLE = True
 except ImportError:
     PDFPLUMBER_AVAILABLE = False
-    print("⚠️  pdfplumber not available. PDF analysis will be limited.")
+    print("[WARN] pdfplumber not available. PDF analysis will be limited.")
 
 try:
     from PIL import Image
     PILLOW_AVAILABLE = True
 except ImportError:
     PILLOW_AVAILABLE = False
-    print("⚠️  Pillow not available. Image analysis will be limited.")
+    print("[WARN] Pillow not available. Image analysis will be limited.")
 
-from sklearn.ensemble import RandomForestClassifier, IsolationForest
-from sklearn.preprocessing import StandardScaler
-import joblib
+try:
+    from sklearn.ensemble import RandomForestClassifier, IsolationForest
+    from sklearn.preprocessing import StandardScaler
+    import joblib
+    ML_LIBS_AVAILABLE = True
+except ImportError:
+    ML_LIBS_AVAILABLE = False
+    print("[WARN] scikit-learn or joblib not available. Some file scanning features will be limited.")
 
 class FileScanner:
     """
@@ -125,9 +130,9 @@ class FileScanner:
             # Scaler for feature normalization
             self.scalers['standard'] = StandardScaler()
             
-            print("✅ Scikit-learn models initialized successfully!")
+            print("[OK] Scikit-learn models initialized successfully!")
         except Exception as e:
-            print(f"⚠️  Could not initialize sklearn models: {e}")
+            print(f"[WARN] Could not initialize sklearn models: {e}")
     
     def _load_pretrained_models(self):
         """Load pre-trained models from Hugging Face or torchvision"""
@@ -140,25 +145,25 @@ class FileScanner:
                 import clip
                 self.models['clip'], self.models['clip_preprocess'] = clip.load("ViT-B/32")
                 self.models['clip'].eval()
-                print("✅ Loaded CLIP model for image analysis")
+                print("[OK] Loaded CLIP model for image analysis")
             except ImportError:
-                print("⚠️  CLIP not available - install with: pip install git+https://github.com/openai/CLIP.git")
+                print("[WARN] CLIP not available - install with: pip install git+https://github.com/openai/CLIP.git")
             
             # 2. Load pre-trained text/embedding model
             try:
                 from sentence_transformers import SentenceTransformer
                 self.models['text_encoder'] = SentenceTransformer('all-MiniLM-L6-v2')
-                print("✅ Loaded Sentence Transformer for text analysis")
+                print("[OK] Loaded Sentence Transformer for text analysis")
             except ImportError:
-                print("⚠️  sentence-transformers not available")
+                print("[WARN] sentence-transformers not available")
             
-            print(f"🎉 Loaded {len(self.models)} pre-trained models successfully!")
+            print(f"[OK] Loaded {len(self.models)} pre-trained models successfully!")
             
         except ImportError as e:
-            print(f"⚠️  PyTorch not installed. ML features limited: {e}")
+            print(f"[WARN] PyTorch not installed. ML features limited: {e}")
             self.use_ml = False
         except Exception as e:
-            print(f"⚠️  Error loading models: {e}")
+            print(f"[WARN] Error loading models: {e}")
             self.use_ml = False
 
     def detect_file_type(self, file_path: str) -> str:

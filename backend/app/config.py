@@ -19,11 +19,13 @@ class Settings(BaseSettings):
     # ===== APPLICATION =====
     APP_NAME: str = "SafeLearn AI"
     DEBUG: bool = True
+    ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:8000,http://localhost:8000"
     
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 @lru_cache()
 def get_settings() -> Settings:

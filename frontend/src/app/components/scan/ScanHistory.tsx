@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-// @ts-ignore
-import api from '../../../api/axios';
+import api from '@/api/axios';
 
 interface ScanHistoryItem {
   id: number;

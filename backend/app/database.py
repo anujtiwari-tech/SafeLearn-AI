@@ -58,4 +58,4 @@ def init_db():
     """Initialize database with all tables"""
     from . import models  # Import models to register them
     Base.metadata.create_all(bind=engine)
-    print("✅ Database initialized successfully")
+    print("[OK] Database initialized successfully")

@@ -31,29 +31,15 @@ app = FastAPI(
 from fastapi.responses import JSONResponse
 from fastapi import Request
 
-# CORS Middleware - Mirroring Origin for Robust Auth
-@app.middleware("http")
-async def add_cors_header(request: Request, call_next):
-    origin = request.headers.get("origin")
-    response = await call_next(request)
-    if origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    
-    # Handle preflight OPTIONS requests
-    if request.method == "OPTIONS":
-        return JSONResponse(
-            content="OK",
-            headers={
-                "Access-Control-Allow-Origin": origin or "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            }
-        )
-    return response
+# CORS Middleware Configuration
+origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 # Include Routers
 app.include_router(auth.router)
