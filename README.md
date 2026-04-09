@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🛡️ SafeLearn AI — Explainable Cybersecurity for Students
 
 <div align="center">
@@ -378,3 +379,6 @@ Made with ❤️ to make the internet safer for students everywhere.
 ⭐ Star this repo if you find it useful!
 
 </div>
+=======
+# SafeLearn-AI
+>>>>>>> 5e702faf3740dc2df645b905ffdcaf41e263b0be
