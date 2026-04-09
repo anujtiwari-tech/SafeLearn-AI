@@ -1,0 +1,19 @@
+# Virtual Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Database
+*.db
+!phishing domains.txt
+/safelearn.sql
+/query.sql
+
+# Environment
+.env
+
+# Cache
+.pytest_cache/
+.mypy_cache/

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛡️ Security Alert - SafeLearn AI</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-dark: #4338CA;
+      --danger: #EF4444;
+      --danger-light: #FEE2E2;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --text-main: #1F2937;
+      --text-muted: #6B7280;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #4338CA 0%, #6366F1 50%, #818CF8 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: var(--text-main);
+    }
+    
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 24px;
+      padding: 48px;
+      width: 100%;
+      max-width: 560px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: var(--danger);
+    }
+    
+    .icon-container {
+      width: 80px;
+      height: 80px;
+      background: var(--danger-light);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      color: var(--danger);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      color: #111827;
+      margin-bottom: 8px;
+      letter-spacing: -0.025em;
+    }
+    
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 16px;
+      margin-bottom: 32px;
+    }
+    
+    .url-box {
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      padding: 14px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #4B5563;
+      word-break: break-all;
+      margin-bottom: 32px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ai-explanation {
+      background: #F3F4F6;
+      border-left: 4px solid var(--primary);
+      padding: 20px;
+      border-radius: 0 12px 12px 0;
+      text-align: left;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .ai-badge {
+      position: absolute;
+      top: -10px;
+      right: 12px;
+      background: var(--primary);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .ai-explanation p {
+      font-size: 15px;
+      line-height: 1.6;
+      color: #374151;
+      font-style: italic;
+    }
+    
+    .section-title {
+      text-align: left;
+      font-size: 14px;
+      font-weight: 700;
+      color: #374151;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .risk-list {
+      list-style: none;
+      text-align: left;
+      margin-bottom: 32px;
+      display: grid;
+      gap: 8px;
+    }
+    
+    .risk-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #FFFBEB;
+      border: 1px solid #FEF3C7;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #92400E;
+    }
+
+    .risk-item.critical { background: #FEF2F2; border-color: #FEE2E2; color: #991B1B; }
+    .risk-item.high { background: #FFF7ED; border-color: #FFEDD5; color: #9A3412; }
+
+    .risk-item .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    
+    .btn {
+      flex: 1;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.39); }
+    .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    
+    .btn-secondary { background: #F3F4F6; color: #374151; border: 1px solid #E5E7EB; }
+    .btn-secondary:hover { background: #E5E7EB; }
+
+    .btn-link {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      text-decoration: underline;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 16px;
+      padding: 8px;
+    }
+    .btn-link:hover {
+      color: var(--danger);
+    }
+    
+    .feedback {
+      background: #F9FAFB;
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid #F3F4F6;
+    }
+
+    .feedback-text {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .feedback-btns {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .f-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid #E5E7EB;
+      background: white;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .f-btn:hover { background: #F3F4F6; border-color: #D1D5DB; }
+    .f-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #111827;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 100;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div style="display: flex; flex-direction: column; align-items: center;">
+    <div class="glass-pill">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      SafeLearn AI Presence Active
+    </div>
+
+    <div class="card">
+      <div class="icon-container">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      
+      <h1>Access Blocked</h1>
+      <p class="subtitle">We've identified a potential risk on this page.</p>
+      
+      <div class="url-box" id="urlBox">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span id="blockedUrl">...</span>
+      </div>
+      
+      <div class="ai-explanation">
+        <div class="ai-badge">AI Counselor</div>
+        <p id="explanation">Analyzing threat details...</p>
+      </div>
+      
+      <div id="riskContainer" style="display: none;">
+        <h3 class="section-title">Risk Indicators</h3>
+        <div class="risk-list" id="riskIndicators"></div>
+      </div>
+      
+      <div class="actions">
+        <button id="btnBack" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Go Back
+        </button>
+        <button id="btnDashboard" class="btn btn-primary">
+          View Full Report
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </button>
+      </div>
+
+      <button id="btnProceed" class="btn-link">Proceed anyway (not recommended)</button>
+      
+      <div class="feedback">
+        <p class="feedback-text">Help us learn! Was this block accurate?</p>
+        <div class="feedback-btns">
+          <button id="fBtnHelpful" class="f-btn">👍 Yes, helpful</button>
+          <button id="fBtnReport" class="f-btn">👎 False alarm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Feedback received!</div>
+  
+  <script src="blocked.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeLearn AI</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="popup-header">
+      <div class="logo">
+        <span class="logo-icon">🛡️</span>
+        <h1>SafeLearn AI</h1>
+      </div>
+      <div class="status-indicator" id="statusIndicator">
+        <span class="status-dot"></span>
+        <span class="status-text">Active</span>
+      </div>
+    </header>
+    
+    <!-- User Info Section -->
+    <section class="user-section" id="userSection">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">U</div>
+        <div class="user-details">
+          <p class="user-name" id="userName">Student</p>
+          <p class="user-email" id="userEmail">student@school.edu</p>
+        </div>
+      </div>
+      <div class="security-score">
+        <div class="score-circle" id="scoreCircle">
+          <span class="score-value" id="scoreValue">50</span>
+          <span class="score-label">/100</span>
+        </div>
+        <p class="score-text">Security Score</p>
+      </div>
+    </section>
+    
+    <!-- Current Page Status -->
+    <section class="page-status" id="pageStatus">
+      <h3>Current Page</h3>
+      <div class="status-card safe" id="pageStatusCard">
+        <span class="status-icon">✅</span>
+        <div class="status-content">
+          <p class="status-title">This page is safe</p>
+          <p class="status-subtitle">No threats detected</p>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Quick Stats -->
+    <section class="stats-section">
+      <h3>Today's Activity</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-icon">🚫</span>
+          <span class="stat-value" id="threatsBlocked">0</span>
+          <span class="stat-label">Threats Blocked</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">🔍</span>
+          <span class="stat-value" id="scansToday">0</span>
+          <span class="stat-label">Today's Scans</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">📈</span>
+          <span class="stat-value" id="totalScans">0</span>
+          <span class="stat-label">Total Protected</span>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Recent Threats -->
+    <section class="recent-threats" id="recentThreats">
+      <h3>Recent Threats</h3>
+      <div class="threat-list" id="threatList">
+        <p class="empty-state">No threats detected yet 🎉</p>
+      </div>
+    </section>
+    
+    <!-- Quick Actions -->
+    <section class="actions-section">
+      <button class="btn btn-primary" id="btnDashboard">
+        📊 View Dashboard
+      </button>
+      <button class="btn btn-secondary" id="btnSettings">
+        ⚙️ Settings
+      </button>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="popup-footer">
+      <p>Protected by SafeLearn AI</p>
+      <a href="#" id="btnLogout" class="logout-link">Sign Out</a>
+    </footer>
+    
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+    
+    <!-- Debug Console -->
+    <div id="debug-console" style="margin-top: 15px; padding: 10px; background: #f8fafc; border-radius: 8px; font-size: 11px; word-break: break-all; color: #475569; border: 1px dashed #cbd5e1;">
+      Storage Dump...
+    </div>
+  </div>
+  
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
