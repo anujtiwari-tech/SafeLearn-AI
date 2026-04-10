@@ -33,13 +33,13 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/content/content-script.js"],
+      "js": ["src/content/content-script.js", "src/content/widget.js"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["*://mail.google.com/*"],
-      "js": ["src/content/gmail-scanner.js"],
+      "js": ["src/content/gmail-scanner.js", "src/content/widget.js"],
       "run_at": "document_idle"
     },
     {
@@ -48,7 +48,7 @@
         "*://outlook.office.com/*",
         "*://outlook.office365.com/*"
       ],
-      "js": ["src/content/outlook-scanner.js"],
+      "js": ["src/content/outlook-scanner.js", "src/content/widget.js"],
       "run_at": "document_idle"
     }
   ],

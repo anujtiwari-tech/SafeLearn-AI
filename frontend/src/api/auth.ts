@@ -6,13 +6,13 @@ import api from './axios';
 export const authApi = {
   /**
    * Register a new user
-   * @param {Object} userData - { email, password, full_name }
+   * @param {Object} userData - { email, password, full_name, role, classroom_code }
    */
-  async register(userData) {
+  async register(userData: any) {
     try {
       const response = await api.post('/auth/register', userData);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       throw error.response?.data || error;
     }
   },
@@ -22,17 +22,22 @@ export const authApi = {
    * @param {string} email 
    * @param {string} password 
    */
-  async login(email, password) {
+  async login(email: string, password: string) {
     try {
       // FastAPI uses OAuth2PasswordRequestForm which expects x-www-form-urlencoded
-      const formData = new FormData();
-      formData.append('username', email);
-      formData.append('password', password);
+      const params = new URLSearchParams();
+      params.append('username', email);
+      params.append('password', password);
 
-      const response = await api.post('/auth/token', formData, {
+      const response = await api.post('/auth/token', params, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
+      });
+
+      // Get additional user info (role) immediately
+      const userProfile = await api.get('/auth/me', {
+        headers: { Authorization: `Bearer ${response.data.access_token}` }
       });
 
       // Store user data and token
@@ -40,12 +45,13 @@ export const authApi = {
         token: response.data.access_token,
         refreshToken: response.data.refresh_token,
         userId: response.data.user_id,
-        email: email
+        email: email,
+        role: userProfile.data.role
       };
       
       localStorage.setItem('user', JSON.stringify(authData));
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       throw error.response?.data || error;
     }
   },
@@ -57,7 +63,7 @@ export const authApi = {
     try {
       const response = await api.get('/auth/me');
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       throw error.response?.data || error;
     }
   },
@@ -74,17 +80,18 @@ export const authApi = {
    * Refresh access token
    * @param {string} refreshToken 
    */
-  async refresh(refreshToken) {
+  async refresh(refreshToken: string) {
     try {
       const response = await api.post(`/auth/refresh?refresh_token=${refreshToken}`);
-      const user = JSON.parse(localStorage.getItem('user'));
-      if (user) {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
         user.token = response.data.access_token;
         user.refreshToken = response.data.refresh_token;
         localStorage.setItem('user', JSON.stringify(user));
       }
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       this.logout();
       throw error;
     }

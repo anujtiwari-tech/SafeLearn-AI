@@ -48,7 +48,7 @@ def check_user_owns_resource(
     current_user: models.User = Depends(get_current_active_user)
 ) -> bool:
     """Check if current user owns a resource (for authorization)"""
-    if current_user.id != user_id and current_user.role != models.UserRole.ADMIN:
+    if current_user.id != user_id and current_user.role != models.UserRole.admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this resource"

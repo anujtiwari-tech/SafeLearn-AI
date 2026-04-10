@@ -1,9 +1,14 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
 from enum import Enum
 
 # ===== AUTH SCHEMAS =====
+
+class UserRole(str, Enum):
+    student = "student"
+    teacher = "teacher"
+    admin = "admin"
 
 class Token(BaseModel):
     """JWT token response"""
@@ -18,6 +23,7 @@ class TokenData(BaseModel):
     user_id: Optional[int] = None
     email: Optional[EmailStr] = None
     type: Optional[str] = None
+    role: Optional[str] = None
 
 class UserBase(BaseModel):
     """Base user fields"""
@@ -27,6 +33,8 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """User registration input"""
     password: str = Field(..., min_length=8, max_length=128)
+    role: UserRole = UserRole.student # Add role to creation
+    classroom_code: Optional[str] = None # Optional code for students to join immediately
     
     @field_validator('password')
     @classmethod
@@ -60,10 +68,75 @@ class UserResponse(UserBase):
     weekly_reports: bool
     protection_paused_until: Optional[datetime] = None
     total_scans: int = 0
+    classroom_id: Optional[int] = None
     created_at: datetime
     
     class Config:
         from_attributes = True
+
+# ===== CLASSROOM SCHEMAS =====
+
+class ClassroomBase(BaseModel):
+    name: str = Field(..., min_length=3, max_length=100)
+    approval_mode: bool = True
+
+class ClassroomCreate(ClassroomBase):
+    pass
+
+class ClassroomUpdate(BaseModel):
+    name: Optional[str] = None
+    approval_mode: Optional[bool] = None
+
+class ClassroomResponse(ClassroomBase):
+    id: int
+    teacher_id: int
+    unique_code: str
+    created_at: datetime
+    student_count: int = 0
+    
+    class Config:
+        from_attributes = True
+
+class ClassroomJoinRequest(BaseModel):
+    unique_code: str = Field(..., min_length=6, max_length=12)
+
+class ClassroomRequestResponse(BaseModel):
+    id: int
+    student_id: int
+    student_name: Optional[str]
+    student_email: str
+    status: str
+    requested_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# ===== TEACHER DASHBOARD SCHEMAS =====
+
+class TeacherDashboardStats(BaseModel):
+    total_students: int
+    avg_security_score: float
+    pending_requests_count: int
+    threats_blocked_today: int
+    active_classrooms: int
+    recent_activity: List[dict] = []
+
+class StudentListItem(BaseModel):
+    id: int
+    full_name: Optional[str]
+    email: str
+    security_score: int
+    total_threats: int
+    lessons_completed: int
+    total_lessons: int
+    last_active: Optional[datetime]
+    status: str # active, pending, etc.
+
+class TeacherSettingsUpdate(BaseModel):
+    classroom_name: Optional[str] = None
+    approval_mode: Optional[bool] = None
+    regenerate_code: bool = False
+    notification_prefs: Optional[dict] = None
 
 # ===== LEARNING HUB SCHEMAS =====
 
@@ -157,7 +230,7 @@ class ThreatAnalysisResponse(BaseModel):
     threat_level: str
     confidence_score: float = Field(..., ge=0.0, le=1.0)
     explanation: str
-    consequences: Optional[str] = None  # ← NEW FIELD: What happens if user ignores warning
+    consequences: Optional[str] = None 
     risk_indicators: List[RiskIndicator]
     performed_checks: List[str] = []
     action_recommended: str  # block, warn, allow
@@ -172,7 +245,7 @@ class ThreatLogResponse(BaseModel):
     threat_level: str
     action_taken: str
     explanation: Optional[str]
-    consequences: Optional[str] = None  # ← NEW FIELD
+    consequences: Optional[str] = None 
     confidence_score: Optional[float]
     risk_indicators: Optional[List[RiskIndicator]] = None
     performed_checks: Optional[List[str]] = None
@@ -203,7 +276,7 @@ class ThreatHistoryItem(BaseModel):
     url: str
     threat_type: str
     explanation: Optional[str]
-    consequences: Optional[str] = None  # ← NEW FIELD
+    consequences: Optional[str] = None 
     timestamp: datetime
     is_helpful: Optional[bool]
     feedback_count: int
@@ -291,3 +364,21 @@ class EmailAnalysisRequest(BaseModel):
 class EmailAnalysisResponse(ThreatAnalysisResponse):
     """Email analysis response (extends ThreatAnalysisResponse)"""
     pass
+
+# ===== STUDENT BLOCKED SITES SCHEMAS =====
+
+class BlockedSiteBase(BaseModel):
+    reason: Optional[str] = None
+
+class BlockedSiteCreate(BlockedSiteBase):
+    url: str
+
+class BlockedSiteResponse(BlockedSiteBase):
+    id: int
+    user_id: int
+    domain: str
+    created_at: datetime
+    is_active: bool
+
+    class Config:
+        from_attributes = True

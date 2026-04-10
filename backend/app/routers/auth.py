@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from .. import models, schemas, database, security
 from ..config import settings
@@ -32,13 +33,33 @@ async def register_user(
         email=user_create.email,
         hashed_password=hashed_password,
         full_name=user_create.full_name,
-        role=models.UserRole.STUDENT,
+        role=user_create.role, # USE ROLE FROM REQUEST
         security_score=50,
         points=0,
         learning_streak=0
     )
     
     db.add(db_user)
+    db.flush() # Get user ID before final commit
+    
+    # Handle classroom code if provided for students
+    if user_create.role == models.UserRole.student and user_create.classroom_code:
+        classroom = db.query(models.Classroom).filter(
+            models.Classroom.unique_code == user_create.classroom_code.upper()
+        ).first()
+        
+        if classroom:
+            if not classroom.approval_mode:
+                db_user.classroom_id = classroom.id
+            
+            # Create a request log anyway
+            new_request = models.ClassroomRequest(
+                student_id=db_user.id,
+                classroom_id=classroom.id,
+                status="approved" if not classroom.approval_mode else "pending"
+            )
+            db.add(new_request)
+    
     db.commit()
     db.refresh(db_user)
     
@@ -77,7 +98,7 @@ async def login_for_access_token(
     )
     
     # Update last login
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.utcnow()
     db.commit()
     
     return {

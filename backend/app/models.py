@@ -1,14 +1,14 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Enum, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from datetime import datetime
 import enum
 
 from .base import Base
 
 class UserRole(str, enum.Enum):
-    STUDENT = "student"
-    TEACHER = "teacher"
-    ADMIN = "admin"
+    student = "student"
+    teacher = "teacher"
+    admin = "admin"
 
 class LearningModuleStatus(str, enum.Enum):
     NOT_STARTED = "not_started"
@@ -22,7 +22,15 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
-    role = Column(String, default="student") # student, teacher, admin
+    role = Column(Enum(UserRole), default=UserRole.student, nullable=False)
+    
+    @validates('role')
+    def validate_role(self, key, value):
+        if isinstance(value, str):
+            return value.lower()
+        return value
+
+    classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=True)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     security_score = Column(Integer, default=50) # 0-100
@@ -45,6 +53,12 @@ class User(Base):
     file_scans = relationship("FileScanLog", back_populates="user")
     learning_progress = relationship("LearningProgress", back_populates="user")
     badges = relationship("UserBadge", back_populates="user")
+    blocked_sites = relationship("BlockedSite", back_populates="user", cascade="all, delete-orphan")
+    
+    # New relationships for teacher/classroom
+    classroom = relationship("Classroom", back_populates="students", foreign_keys=[classroom_id])
+    owned_classroom = relationship("Classroom", back_populates="teacher", uselist=False, foreign_keys="Classroom.teacher_id")
+    classroom_requests = relationship("ClassroomRequest", back_populates="student")
 
 class ThreatLog(Base):
     __tablename__ = "threat_logs"
@@ -123,3 +137,61 @@ class Feedback(Base):
 
     # Relationships
     threat_log = relationship("ThreatLog", back_populates="feedback")
+
+class Classroom(Base):
+    __tablename__ = "classrooms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    teacher_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    unique_code = Column(String, unique=True, index=True, nullable=False) # 8-char alphanumeric
+    approval_mode = Column(Boolean, default=True) # if True, students need approval to join
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    teacher = relationship("User", back_populates="owned_classroom", foreign_keys=[teacher_id])
+    students = relationship("User", back_populates="classroom", foreign_keys=[User.classroom_id])
+    requests = relationship("ClassroomRequest", back_populates="classroom")
+
+class ClassroomRequest(Base):
+    __tablename__ = "classroom_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"))
+    classroom_id = Column(Integer, ForeignKey("classrooms.id"))
+    status = Column(String, default="pending") # pending, approved, rejected
+    requested_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    student = relationship("User", back_populates="classroom_requests")
+    classroom = relationship("Classroom", back_populates="requests")
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    token_hash = Column(String, index=True, nullable=False)
+    is_revoked = Column(Boolean, default=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+class BlockedSite(Base):
+    __tablename__ = "blocked_sites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    domain = Column(String(255), nullable=False, index=True)
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+
+    # Relationships
+    user = relationship("User", back_populates="blocked_sites")
+
+    def __repr__(self):
+        return f"<BlockedSite(id={self.id}, domain='{self.domain}', user_id={self.user_id})>"

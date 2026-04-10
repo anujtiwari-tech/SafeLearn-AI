@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../../api/axios";
+import { ClassroomInfoCard } from "./dashboard/ClassroomInfoCard";
 
 export function SettingsPage() {
   const [user, setUser] = useState<any>(null);

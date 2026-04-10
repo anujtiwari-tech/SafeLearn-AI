@@ -110,7 +110,11 @@ class AIService:
             return result
             
         except Exception as e:
-            logger.error(f"Groq API Error: {str(e)}")
+            error_msg = str(e)
+            if "401" in error_msg or "Invalid API Key" in error_msg:
+                logger.error("Groq API Error: Unauthorized (401). Please check your GROQ_API_KEY in .env")
+            else:
+                logger.error(f"Groq API Error: {error_msg}")
             if is_threat:
                 return {
                     "verdict": "Security Alert",

@@ -81,6 +81,49 @@ async def analyze_threat(
     current_user.total_scans += 1
     db.commit()
     
+    # NEW: Check if URL is in student's personal manual blocklist
+    domain = request.url.replace("https://", "").replace("http://", "").replace("www.", "")
+    domain = domain.split("/")[0].split("?")[0].lower()
+
+    if domain:
+        blocked_sites = db.query(models.BlockedSite).filter(
+            models.BlockedSite.user_id == user_id,
+            models.BlockedSite.is_active == True
+        ).all()
+        
+        for site in blocked_sites:
+            if domain == site.domain or domain.endswith("." + site.domain):
+                explanation = f"Verdict: **Blocked by You**\nReasoning: This website is on your personal distraction blocklist. {site.reason or ''}\nSafety Tip: Stay focused!"
+                consequences = "Distraction avoided."
+                structured_indicators = [{"type": "Focus", "detail": "On personal blocklist", "severity": "medium"}]
+                
+                threat_log = models.ThreatLog(
+                    user_id=user_id,
+                    url=request.url,
+                    threat_type="Personal Blocklist",
+                    threat_level="high",
+                    action_taken="block",
+                    explanation=explanation,
+                    risk_indicators=json.dumps(structured_indicators),
+                    performed_checks="Internal blocklist check",
+                    scan_metadata=json.dumps({"verdict": "Blocked by You", "consequences": consequences, "simple_explanation": "You blocked this website."})
+                )
+                db.add(threat_log)
+                db.commit()
+                
+                return schemas.ThreatAnalysisResponse(
+                    is_threat=True,  # Force extension to block it
+                    threat_type="Personal Blocklist",
+                    threat_level="high",
+                    confidence_score=1.0,
+                    explanation=explanation,
+                    consequences=consequences,
+                    risk_indicators=structured_indicators,
+                    performed_checks=["Internal blocklist check"],
+                    action_recommended="block",
+                    timestamp=datetime.now(timezone.utc)
+                )
+
     is_url_threat, threat_type, url_indicators, url_confidence, performed_checks = threat_detector.analyze_url(request.url)
     
     is_text_threat = False

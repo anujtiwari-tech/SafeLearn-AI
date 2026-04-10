@@ -6,7 +6,7 @@ const bypassedUrls = new Set();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Check if URL is in cache and not expired
+ * Get cached analysis result
  */
 function getCachedAnalysis(url) {
   const cached = urlCache.get(url);
@@ -18,7 +18,7 @@ function getCachedAnalysis(url) {
 }
 
 /**
- * Cache URL analysis result
+ * Cache analysis result
  */
 function cacheAnalysis(url, data) {
   urlCache.set(url, {
@@ -53,9 +53,118 @@ function categorizeURL(url) {
 }
 
 /**
+ * Extract safety tip from explanation
+ */
+function extractSafetyTip(explanation) {
+  if (!explanation) return 'Always verify website URLs before entering personal information.';
+  
+  const tipMatch = explanation.match(/Safety Tip: (.+?)(?:\n|$)/i);
+  if (tipMatch) {
+    return tipMatch[1].trim();
+  }
+  
+  const tipMatch2 = explanation.match(/Tip: (.+?)(?:\n|$)/i);
+  if (tipMatch2) {
+    return tipMatch2[1].trim();
+  }
+  
+  return 'Always verify website URLs before entering personal information.';
+}
+
+/**
+ * Check if URL should be skipped
+ */
+function shouldSkipURL(url) {
+  const skipPatterns = [
+    /^chrome:\/\//,
+    /^chrome-extension:\/\//,
+    /^about:/,
+    /^file:\/\//,
+    /^localhost:/,
+    /^127\.0\.0\.1:/,
+    /favicon\.ico$/,
+    /\.js$/,
+    /\.css$/,
+    /\.png$/,
+    /\.jpg$/,
+    /\.svg$/
+  ];
+
+  return skipPatterns.some(pattern => pattern.test(url));
+}
+
+/**
+ * Show threat notification
+ */
+async function showThreatNotification(analysis) {
+  const settings = await storage.getSettings();
+  if (settings.showNotifications) {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon128.png',
+      title: '🛡️ Threat Blocked',
+      message: (analysis.explanation || 'A threat was blocked').substring(0, 100),
+      priority: 2
+    });
+  }
+}
+
+/**
+ * Show warning notification
+ */
+async function showWarningNotification(analysis) {
+  const settings = await storage.getSettings();
+  if (settings.showNotifications) {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon128.png',
+      title: '⚠️ Security Warning',
+      message: (analysis.explanation || 'Potential threat detected').substring(0, 100),
+      priority: 1
+    });
+  }
+}
+
+/**
+ * Broadcast analysis result to all listeners
+ */
+function broadcastAnalysis(tabId, url, analysis, category, source = 'navigation') {
+  const result = { ...analysis, category, source };
+  
+  // Send to specific tab
+  if (tabId) {
+    chrome.tabs.sendMessage(tabId, {
+      type: 'ANALYSIS_COMPLETED',
+      url: url,
+      result: result
+    }).catch(() => {});
+  }
+  
+  // Send to all extension listeners (popup, dashboard)
+  chrome.runtime.sendMessage({
+    type: 'ANALYSIS_COMPLETED',
+    url: url,
+    result: result
+  }).catch(() => {});
+  
+  // Send widget-specific update
+  chrome.runtime.sendMessage({
+    type: 'WIDGET_UPDATE',
+    url: url,
+    result: {
+      is_threat: analysis.is_threat || false,
+      threat_type: analysis.threat_type || 'None',
+      threat_level: analysis.threat_level || 'safe',
+      explanation: analysis.explanation || 'This page appears safe to browse.',
+      safety_tip: extractSafetyTip(analysis.explanation)
+    }
+  }).catch(() => {});
+}
+
+/**
  * Analyze URL for threats
  */
-async function analyzeURL(url, tabId) {
+async function analyzeURL(url, tabId, source = 'navigation') {
   // Skip safe/internal URLs
   if (shouldSkipURL(url)) {
     return null;
@@ -74,7 +183,7 @@ async function analyzeURL(url, tabId) {
     type: 'SCAN_STARTED',
     url: url,
     category: category
-  }).catch(() => { });
+  }).catch(() => {});
 
   // Check if protection is paused by the user
   try {
@@ -84,7 +193,6 @@ async function analyzeURL(url, tabId) {
       return null;
     }
   } catch (err) {
-    // If we can't check status (e.g. not logged in), continue scanning
     console.warn('Could not check protection status:', err.message);
   }
 
@@ -92,7 +200,7 @@ async function analyzeURL(url, tabId) {
   const cached = getCachedAnalysis(url);
   if (cached) {
     console.log('📦 Using cached analysis for:', url);
-    broadcastAnalysis(tabId, url, cached, category);
+    broadcastAnalysis(tabId, url, cached, category, source);
     return cached;
   }
 
@@ -115,9 +223,9 @@ async function analyzeURL(url, tabId) {
       scansToday: currentStats.scansToday + 1,
       totalScans: (currentStats.totalScans || 0) + 1
     });
-    chrome.runtime.sendMessage({ type: 'STATS_UPDATED' }).catch(() => { });
+    chrome.runtime.sendMessage({ type: 'STATS_UPDATED' }).catch(() => {});
 
-    // Always log to history (user request: "update the threatshistorypage")
+    // Always log to history
     await storage.addThreatToHistory({
       url,
       threat_type: analysis.is_threat ? analysis.threat_type : (category === 'Email' ? 'Safe Email' : 'Safe Site'),
@@ -147,7 +255,7 @@ async function analyzeURL(url, tabId) {
     }
 
     // Broadcast analysis completed for UI updates
-    broadcastAnalysis(tabId, url, analysis, category);
+    broadcastAnalysis(tabId, url, analysis, category, source);
 
     return analysis;
   } catch (error) {
@@ -158,90 +266,14 @@ async function analyzeURL(url, tabId) {
 }
 
 /**
- * Helper to broadcast analysis result
- */
-function broadcastAnalysis(tabId, url, analysis, category) {
-  const result = { ...analysis, category };
-  
-  // To specific tab
-  if (tabId) {
-    chrome.tabs.sendMessage(tabId, {
-      type: 'ANALYSIS_COMPLETED',
-      url: url,
-      result: result
-    }).catch(() => { });
-  }
-
-  // To all other listeners (popup, dashboard)
-  chrome.runtime.sendMessage({
-    type: 'ANALYSIS_COMPLETED',
-    url: url,
-    result: result
-  }).catch(() => { });
-}
-
-/**
- * Check if URL should be skipped
- */
-function shouldSkipURL(url) {
-  const skipPatterns = [
-    /^chrome:\/\//,
-    /^chrome-extension:\/\//,
-    /^about:/,
-    /^file:\/\//,
-    /^localhost:/,
-    /^127\.0\.0\.1:/,
-    /favicon\.ico$/,
-    /\.js$/,
-    /\.css$/
-  ];
-
-  return skipPatterns.some(pattern => pattern.test(url));
-}
-
-/**
- * Show threat notification
- */
-async function showThreatNotification(analysis) {
-  const settings = await storage.getSettings();
-
-  if (settings.showNotifications) {
-    chrome.notifications.create({
-      type: 'basic',
-      iconUrl: 'icons/icon128.png',
-      title: '🛡️ Threat Blocked',
-      message: analysis.explanation.substring(0, 100) + '...',
-      priority: 2
-    });
-  }
-}
-
-/**
- * Show warning notification
- */
-async function showWarningNotification(analysis) {
-  const settings = await storage.getSettings();
-
-  if (settings.showNotifications) {
-    chrome.notifications.create({
-      type: 'basic',
-      iconUrl: 'icons/icon128.png',
-      title: '⚠️ Security Warning',
-      message: analysis.explanation.substring(0, 100) + '...',
-      priority: 1
-    });
-  }
-}
-
-/**
- * Message handler for communication with popup/content scripts
+ * Message handler for communication with popup/content scripts/widget
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('📨 Message received:', message.type, 'from', sender.url);
 
   switch (message.type) {
     case 'ANALYSE_URL':
-      analyzeURL(message.url, sender.tab?.id)
+      analyzeURL(message.url, sender.tab?.id, 'manual')
         .then(result => {
           console.log('✅ URL analyzed:', message.url);
           sendResponse({ success: true, data: result });
@@ -250,21 +282,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           console.error('❌ URL analysis error:', error);
           sendResponse({ success: false, error: error.message });
         });
-      return true; // Keep channel open for async response
+      return true;
 
     case 'ANALYZE_EMAIL':
-      console.log('📧 Analyzing email data:', message.emailData.subject);
+      console.log('📧 Analyzing email data:', message.emailData?.subject);
       api.request('/threats/analyze-email', {
         method: 'POST',
         body: JSON.stringify(message.emailData)
       })
         .then(result => {
           console.log('✅ Email analysis result:', result.is_threat ? 'THREAT' : 'SAFE');
-          // High-priority broadcast for content scan
           broadcastAnalysis(sender.tab?.id, message.emailData.current_url || 'Email Content', {
             ...result,
-            is_content_scan: true // Mark as high priority content scan
-          }, 'Email');
+            is_content_scan: true
+          }, 'Email', 'email_scan');
           sendResponse({ success: true, data: result });
         })
         .catch(error => {
@@ -274,7 +305,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'SUBMIT_FEEDBACK':
-      console.log(`🛡️ SafeLearn: Submitting feedback for ID ${message.threatLogId}, Helpful: ${message.isHelpful}`);
+      console.log(`🛡️ Submitting feedback for ID ${message.threatLogId}, Helpful: ${message.isHelpful}`);
       api.submitFeedback(message.threatLogId, message.isHelpful, message.comment)
         .then(result => sendResponse({ success: true, data: result }))
         .catch(error => {
@@ -289,7 +320,70 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true });
       return true;
 
+    case 'WIDGET_ANALYZE_URL':
+      console.log('🖥️ Widget requesting analysis for:', message.url);
+      
+      // Get cached analysis first
+      const cachedResult = getCachedAnalysis(message.url);
+      if (cachedResult) {
+        console.log('📦 Widget using cached result for:', message.url);
+        sendResponse({
+          success: true,
+          data: {
+            is_threat: cachedResult.is_threat || false,
+            threat_type: cachedResult.threat_type || 'None',
+            threat_level: cachedResult.threat_level || 'safe',
+            explanation: cachedResult.explanation || 'This page appears safe to browse.',
+            safety_tip: extractSafetyTip(cachedResult.explanation)
+          }
+        });
+        return true;
+      }
+      
+      // Perform fresh analysis
+      analyzeURL(message.url, sender.tab?.id, 'widget')
+        .then(result => {
+          if (result) {
+            sendResponse({
+              success: true,
+              data: {
+                is_threat: result.is_threat || false,
+                threat_type: result.threat_type || 'None',
+                threat_level: result.threat_level || 'safe',
+                explanation: result.explanation || 'This page appears safe to browse.',
+                safety_tip: extractSafetyTip(result.explanation)
+              }
+            });
+          } else {
+            sendResponse({
+              success: true,
+              data: {
+                is_threat: false,
+                threat_type: 'None',
+                threat_level: 'safe',
+                explanation: 'This page appears safe to browse.',
+                safety_tip: 'Always verify website URLs before entering personal information.'
+              }
+            });
+          }
+        })
+        .catch(error => {
+          console.error('❌ Widget analysis error:', error);
+          sendResponse({
+            success: false,
+            data: {
+              is_threat: false,
+              threat_type: 'Unknown',
+              threat_level: 'unknown',
+              explanation: 'Unable to analyze this page. The security service may be unavailable.',
+              safety_tip: 'Stay cautious when entering personal information online.'
+            }
+          });
+        });
+      return true;
+
     default:
+      console.warn('⚠️ Unknown message type:', message.type);
       sendResponse({ success: false, error: 'Unknown message type' });
   }
 });
@@ -299,8 +393,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  */
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'loading' && tab.url) {
-    // Analyze the URL
-    await analyzeURL(tab.url, tabId);
+    await analyzeURL(tab.url, tabId, 'navigation');
   }
 });
 

@@ -16,17 +16,29 @@ async def get_dashboard_stats(
     user_id = current_user.id
     
     # Calculate threats blocked today
-    today = datetime.utcnow().date()
+    today_dt = datetime.utcnow()
+    today_start = today_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    
     threats_today = db.query(models.ThreatLog).filter(
         and_(
             models.ThreatLog.user_id == user_id,
-            func.date(models.ThreatLog.timestamp) == today,
+            models.ThreatLog.timestamp >= today_start,
+            models.ThreatLog.action_taken == "block"
+        )
+    ).count()
+
+    # Calculate threats blocked this week (last 7 days)
+    seven_days_ago = today_dt - timedelta(days=7)
+    threats_week = db.query(models.ThreatLog).filter(
+        and_(
+            models.ThreatLog.user_id == user_id,
+            models.ThreatLog.timestamp >= seven_days_ago,
             models.ThreatLog.action_taken == "block"
         )
     ).count()
     
     # Calculate threats blocked this month
-    month_start = today.replace(day=1)
+    month_start = today_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     threats_month = db.query(models.ThreatLog).filter(
         and_(
             models.ThreatLog.user_id == user_id,
@@ -58,14 +70,14 @@ async def get_dashboard_stats(
     return schemas.DashboardStats(
         security_score=current_user.security_score,
         threats_blocked_today=threats_today,
-        threats_blocked_week=threats_today * 2, # Placeholder for demo
+        threats_blocked_week=threats_week,
         threats_blocked_month=threats_month,
         learning_streak=current_user.learning_streak,
         learning_progress=learning_progress,
         badges_earned=badges,
         total_points=current_user.points,
         total_scans=current_user.total_scans,
-        last_activity=datetime.now(timezone.utc)
+        last_activity=datetime.utcnow()
     )
 
 @router.get("/history", response_model=list[schemas.ThreatHistoryItem])
@@ -85,7 +97,7 @@ async def get_dashboard_threat_history(
             url=t.url,
             threat_type=t.threat_type,
             explanation=t.explanation,
-            timestamp=t.timestamp.replace(tzinfo=timezone.utc),
+            timestamp=t.timestamp.replace(tzinfo=timezone.utc) if t.timestamp.tzinfo is None else t.timestamp,
             is_helpful=t.feedback[0].is_helpful if t.feedback else None,
             feedback_count=len(t.feedback)
         )

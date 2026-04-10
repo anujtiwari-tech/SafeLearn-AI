@@ -44,9 +44,9 @@ def create_access_token(
     
     # Set expiration
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(
+        expire = datetime.utcnow() + timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES 
             if token_type == "access" 
             else settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60
@@ -54,7 +54,7 @@ def create_access_token(
     
     to_encode.update({
         "exp": expire,
-        "iat": datetime.now(timezone.utc),
+        "iat": datetime.utcnow(),
         "type": token_type  # Distinguish access vs refresh tokens
     })
     
@@ -137,6 +137,26 @@ async def get_current_active_user(
             detail="Inactive user"
         )
     return current_user
+
+def require_role(allowed_role: Union[str, models.UserRole]):
+    """
+    Dependency factory to enforce specific roles on endpoints.
+    Usage: Depends(require_role(models.UserRole.teacher))
+    """
+    async def role_checker(
+        current_user: models.User = Depends(get_current_active_user)
+    ) -> models.User:
+        # Check if user has required role
+        user_role_val = current_user.role.value if hasattr(current_user.role, 'value') else current_user.role
+        allowed_role_val = allowed_role if isinstance(allowed_role, str) else allowed_role.value
+        
+        if user_role_val != allowed_role_val:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: {allowed_role_val} role required"
+            )
+        return current_user
+    return role_checker
 
 async def get_current_admin_user(
     current_user: models.User = Depends(get_current_user)

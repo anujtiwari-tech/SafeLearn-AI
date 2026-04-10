@@ -9,7 +9,7 @@ def create_user(
     email: str,
     password: str,
     full_name: Optional[str] = None,
-    role: models.UserRole = models.UserRole.STUDENT
+    role: models.UserRole = models.UserRole.student
 ) -> models.User:
     """Create a new user with hashed password"""
     hashed_password = security.get_password_hash(password)
@@ -137,9 +137,7 @@ def store_refresh_token(
     refresh_token = models.RefreshToken(
         user_id=user_id,
         token_hash=token_hash,
-        expires_at=datetime.now(timezone.utc).replace(
-            day=datetime.now(timezone.utc).day + settings.REFRESH_TOKEN_EXPIRE_DAYS
-        ),
+        expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         is_revoked=False
     )
     
@@ -161,7 +159,7 @@ def is_refresh_token_valid(
         models.RefreshToken.user_id == user_id,
         models.RefreshToken.token_hash == token_hash,
         models.RefreshToken.is_revoked == False,
-        models.RefreshToken.expires_at > datetime.now(timezone.utc)
+        models.RefreshToken.expires_at > datetime.utcnow()
     ).first()
     
     return refresh_token is not None
@@ -217,7 +215,7 @@ def rotate_refresh_token(
 def cleanup_expired_tokens(db: Session, user_id: Optional[int] = None) -> int:
     """Delete expired refresh tokens"""
     query = db.query(models.RefreshToken).filter(
-        models.RefreshToken.expires_at < datetime.now(timezone.utc)
+        models.RefreshToken.expires_at < datetime.utcnow()
     )
     
     if user_id:

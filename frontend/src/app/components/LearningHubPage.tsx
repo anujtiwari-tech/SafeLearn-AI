@@ -27,6 +27,7 @@ import api from "../../api/axios";
 import { toast } from "sonner";
 import { quizzes, isQuizCompleted } from "../data/quizzes";
 import { VideoModal } from "./VideoModal";
+import { Leaderboard } from "./Leaderboard";
 
 interface LearningModule {
   id: string;
@@ -264,6 +265,9 @@ export function LearningHubPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Leaderboard Section - NEW */}
+      <Leaderboard limit={10} />
 
       {/* Main Content - Left: Badges + Modules | Right: Progress + Videos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
